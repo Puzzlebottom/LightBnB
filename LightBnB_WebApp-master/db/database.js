@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 const { Pool } = require('pg');
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
@@ -22,7 +23,6 @@ const getUserWithEmail = function(email) {
     .query('SELECT * FROM users WHERE email = $1', [email])
     .then((result) => {
       const resolvedUser = result.rows[0] ? result.rows[0] : null;
-      console.log('USER: ', resolvedUser);
       return resolvedUser;
     })
     .catch((err) => {
@@ -71,7 +71,26 @@ const addUser = function(user) {
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  return getAllProperties(null, 2);
+
+  const queryString = `
+  SELECT prop.*, AVG(rev.rating) AS average_rating
+  FROM properties AS prop
+  JOIN reservations AS res ON (prop.id = res.property_id)
+  JOIN property_reviews AS rev ON (prop.id = rev.property_id)
+ WHERE res.guest_id = $1
+ GROUP BY prop.id, res.id
+ ORDER BY res.start_date
+ LIMIT $2;`;
+  const values = [guest_id, limit];
+
+  return pool
+    .query(queryString, values)
+    .then((result) => {
+      return result.rows;
+    })
+    .catch((err) => {
+      console.log(err.message);
+    });
 };
 
 /// Properties
