@@ -2,6 +2,7 @@
 const { Pool } = require('pg');
 const properties = require('./json/properties.json');
 const users = require('./json/users.json');
+const { mixin } = require('objection');
 
 const pool = new Pool({
   user: 'vagrant',
@@ -103,8 +104,47 @@ const getAllReservations = function(guest_id, limit = 10) {
  */
 const getAllProperties = (options, limit = 10) => {
 
+  const { city, owner_id, minimum_price_per_night = 0, maximum_price_per_night, minimum_rating } = options;
+
+  let queryString = `
+  SELECT prop.*, AVG(rev.rating) as average_rating
+  FROM properties prop
+  JOIN property_reviews rev ON (property_id = prop.id)
+  `;
+  const queryParams = [];
+
+  if (city) {
+    queryParams.push(`%${city}%`);
+    queryString += `WHERE prop.city ILIKE $${queryParams.length} `;
+  }
+
+  if (owner_id) {
+    const term = queryParams.length > 0 ? 'AND' : 'WHERE';
+    queryParams.push(owner_id);
+    queryString += `${term} prop.owner_id = $${queryParams.length} `;
+  }
+
+  queryParams.push(Number(minimum_price_per_night) * 100);
+  queryString += `GROUP BY prop.id HAVING cost_per_night >= $${queryParams.length} `;
+
+  if (maximum_price_per_night) {
+    queryParams.push(maximum_price_per_night * 100);
+    queryString += `AND prop.cost_per_night <= $${queryParams.length} `;
+  }
+
+  if (minimum_rating) {
+    queryParams.push(Number(minimum_rating));
+    queryString += `AND AVG(rev.rating) >= $${queryParams.length} `;
+  }
+
+  queryParams.push(limit);
+  queryString += `ORDER BY prop.cost_per_night LIMIT $${queryParams.length}`;
+
+  console.log('QUERYSTRING: ', queryString, '\n');
+  console.log('QUERYPARAMS: ', queryParams, '\n\n');
+
   return pool
-    .query('SELECT * FROM properties LIMIT $1', [limit])
+    .query(queryString, queryParams)
     .then((result) => {
       return result.rows;
     })
