@@ -1,15 +1,5 @@
 /* eslint-disable camelcase */
-const { Pool } = require('pg');
-const properties = require('./json/properties.json');
-const users = require('./json/users.json');
-const { mixin } = require('objection');
-
-const pool = new Pool({
-  user: 'vagrant',
-  password: '123',
-  host: 'localhost',
-  database: 'lightbnb'
-});
+const { query, getClient } = require('./index.js');
 
 /// Users
 
@@ -20,8 +10,7 @@ const pool = new Pool({
  */
 const getUserWithEmail = function(email) {
 
-  return pool
-    .query('SELECT * FROM users WHERE email = $1', [email])
+  return query('SELECT * FROM users WHERE email = $1', [email])
     .then((result) => {
       const resolvedUser = result.rows[0] ? result.rows[0] : null;
       return resolvedUser;
@@ -37,8 +26,7 @@ const getUserWithEmail = function(email) {
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithId = function(id) {
-  return pool
-    .query('SELECT * FROM users WHERE id = $1', [id])
+  return query('SELECT * FROM users WHERE id = $1', [id])
     .then((result) => {
       const resolvedUser = result.rows[0] ? result.rows[0] : null;
       return resolvedUser;
@@ -56,8 +44,7 @@ const getUserWithId = function(id) {
 const addUser = function(user) {
   const { name, email, password } = user;
 
-  return pool
-    .query('INSERT INTO users(name, email, password) VALUES($1, $2, $3) RETURNING *;', [name, email, password])
+  return query('INSERT INTO users(name, email, password) VALUES($1, $2, $3) RETURNING *;', [name, email, password])
     .then((user) => user)
     .catch((err) => {
       console.log(err.message);
@@ -84,8 +71,7 @@ const getAllReservations = function(guest_id, limit = 10) {
  LIMIT $2;`;
   const values = [guest_id, limit];
 
-  return pool
-    .query(queryString, values)
+  return query(queryString, values)
     .then((result) => {
       return result.rows;
     })
@@ -140,11 +126,7 @@ const getAllProperties = (options, limit = 10) => {
   queryParams.push(limit);
   queryString += `ORDER BY prop.cost_per_night LIMIT $${queryParams.length}`;
 
-  console.log('QUERYSTRING: ', queryString, '\n');
-  console.log('QUERYPARAMS: ', queryParams, '\n\n');
-
-  return pool
-    .query(queryString, queryParams)
+  return query(queryString, queryParams)
     .then((result) => {
       return result.rows;
     })
@@ -176,8 +158,7 @@ const addProperty = function(property) {
     number_of_bedrooms
   } = property;
 
-  return pool
-    .query(`
+  return query(`
     INSERT INTO properties(    
       owner_id,
       title,
@@ -194,21 +175,21 @@ const addProperty = function(property) {
       number_of_bathrooms,
       number_of_bedrooms) 
     VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *;`, [
-      owner_id,
-      title,
-      description,
-      thumbnail_photo_url,
-      cover_photo_url,
-      cost_per_night * 100,
-      street,
-      city,
-      province,
-      post_code,
-      country,
-      parking_spaces,
-      number_of_bathrooms,
-      number_of_bedrooms
-    ])
+    owner_id,
+    title,
+    description,
+    thumbnail_photo_url,
+    cover_photo_url,
+    cost_per_night * 100,
+    street,
+    city,
+    province,
+    post_code,
+    country,
+    parking_spaces,
+    number_of_bathrooms,
+    number_of_bedrooms
+  ])
     .then((property) => property)
     .catch((err) => {
       console.log(err.message);
